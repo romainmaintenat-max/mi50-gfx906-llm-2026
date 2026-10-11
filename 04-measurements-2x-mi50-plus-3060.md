@@ -259,7 +259,9 @@ llama-server, 30B-A3B Q4_0, one MI50, `-np 4`:
 
 Gain: c1 TTFT ÷ 31, throughput +43 %; c4 median TTFT ÷ 4.6, throughput +38 %. Junction max 73 °C (ON) vs 79 °C (OFF).
 
-Overall: TTFT divided by 30-50 at c1, throughput +38 to +86 %, and **less heat** — the only time the 72B on vLLM held both c1 and c4 at 200 W was with the prefix cache on (81-82 °C).
+⚠️ **Correction (found later the same evening):** with vLLM 0.12's `random` dataset, `--random-prefix-len 2000 --random-input-len 48` produces **identical prompts** (the 2,000 random prefix tokens re-encode to more than 2,048 tokens and the truncation cuts the 48 variable ones; verified: 1 distinct prompt out of 4). The gains above were therefore measured on **repeated identical requests**. With a `prefix_repetition` dataset (2,000 shared + 48 truly distinct tokens), llama-server on the 72B goes from 10.5 s to 0.42 s of prefill per request: **÷25** (180 W, section 9).
+
+Overall (identical-prompt caveat above): TTFT divided by 30-50 at c1, throughput +38 to +86 %, and **less heat** — the only time the 72B on vLLM held both c1 and c4 at 200 W was with the prefix cache on (81-82 °C).
 
 ---
 
@@ -384,11 +386,29 @@ The climb slows but **does not provably stop**: +2 °C over the last two minutes
 - About −15 W real mean per card under load (177-184 W vs 189-196 W).
 - About **−4 to −5 °C** junction max at equal load; time to 85 °C roughly **doubled**.
 - Speed cost: generation −0.4 to −2.2 %, prefill −2 to −4 %, TTFT +3 %.
-- First time in the session that a sustained 72B server load stayed under the 90 °C guard.
+- First time in the session that a 72B server load (5.5 min) stayed under the 90 °C guard — but see the 30-min test below: it did not last.
 
 **180 W was adopted as the operating cap after these tests.**
 
 ---
+
+### Long sustained load — 72B Q4_0 llama-server tensor, c1, prompt cache ON, 30 min planned
+
+Same server as T3 but with the prompt cache on; `prefix_repetition` dataset (2,000 shared + 48 distinct tokens, 256 out, `--ignore-eos`); cold start at 32-33 °C; blowers at 100 % from the first minute; case top exhaust on the BIOS curve (~34-51 %).
+
+| | MI50 #1 (top card) | MI50 #2 |
+|---|---|---|
+| Time to 80 / 85 / 88 / 90 °C | 46 / 148 / 238 / **582 s** | 48 / 164 / 380 / never |
+| Plateau | **none**: 88 °C from minute 3 to 7, then 89, then 90 | 87-88 °C from minute 4 to 9 (6 min only) |
+| Samples ≥ 85 °C after minute 3 | 96.5 % | 91.6 % |
+| Mean power under load | 177 W | 178 W |
+
+- **The safety guard cut the run at 90 °C after 9 min 42 s of load** (8 min 43 s of the measured 30 min).
+- No throttling visible before 90 °C: core clock steady (≈1,600 MHz mean), generation 17.04 → 17.03 t/s across the run.
+- Prefill per request with the shared prefix cached: 0.42 s (vs 10.5 s for the full 2,048 tokens).
+- One run, no control for the case-fan setting (T3 had the top exhaust forced to 100 %; this run had the BIOS curve).
+
+**Conclusion so far:** on this rig, **180 W makes short runs safe but does not make a continuous single-stream server load sustainable on the hotter (top) card.** Next candidates, untested: 160 W, permanently forced case exhaust, duty-cycling requests.
 
 ## 10. Caveats / what is tainted or not measured
 

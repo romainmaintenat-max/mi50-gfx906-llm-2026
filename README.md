@@ -18,7 +18,7 @@ A home-lab write-up, as of **11 October 2026**: what still runs on the MI50 (gfx
 - **Upstream llama.cpp `-sm tensor` works on 2x MI50 over PCIe without P2P**, and beats `-sm layer`: 27B 32.3 vs 24.0 t/s; 72B Q4_0 16.77 vs 11.36 t/s (200 W cap). See 04.
 - **One llama.cpp binary with HIP + CUDA back-ends** (`GGML_BACKEND_DL`) drives 2x MI50 + RTX 3060 together. Cost: up to ~7 % generation on the tested models. See 04.
 - **vLLM (gfx906 fork) 72B AWQ TP2** gives the best single-stream decode measured here (~22 t/s), with a ~10 s time to first token on a 2k prompt. See 04.
-- **At 200 W, sustained dense load reached 90 °C junction** on this rig even with the blower at full speed; **180 W cost 0.4–2.2 % generation and 2–4 % prefill**, with no cut in the three 180 W runs (one run each, ≤ 6 min; long sustained load not yet tested). See 04.
+- **At 200 W, sustained dense load reached 90 °C junction** on this rig even with the blower at full speed; **180 W cost 0.4–2.2 % generation and 2–4 % prefill**, with no cut in three short 180 W runs (≤ 6 min each) — **but a continuous 72B server load at 180 W was still cut at 90 °C after ~10 min on the hotter card** (one run). See 04.
 - **Format matters as much as the engine on gfx906**: Q4_0 / Q4_1 / Q8_0 have dedicated kernels; K-quants and IQ formats take slower paths unless a fork repacks them. See 01.
 - **In this memory window, a recent dense 27B at Q8 beats every 2026 MoE that fits** on independent indices; compressed Chinese flagships do not fit in a standard-llama.cpp format. See 02 and 03 — and note what they do *not* measure (French, long-form writing).
 
